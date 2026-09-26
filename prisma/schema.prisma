@@ -27,7 +27,6 @@ model Booking {
   customerName  String
   customerEmail String
   status        BookingStatus @default(active)
-  createdAt     DateTime      @default(now())
   slot          Slot          @relation(fields: [slotId], references: [id], onDelete: Restrict)
 
   @@index([slotId])

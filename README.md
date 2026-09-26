@@ -88,7 +88,7 @@ Possible improvements include broader negative-case E2E coverage and automated S
 
 Actual implementation time: [FILL BEFORE SUBMISSION]
 
-Incomplete requirements: None.
+Incomplete requirements: the actual implementation time must be filled by the candidate before submission.
 
 ## AI usage
 

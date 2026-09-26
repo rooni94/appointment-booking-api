@@ -14,7 +14,6 @@ CREATE TABLE "Booking" (
     "customerName" TEXT NOT NULL,
     "customerEmail" TEXT NOT NULL,
     "status" "BookingStatus" NOT NULL DEFAULT 'active',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Booking_pkey" PRIMARY KEY ("id")
 );
 

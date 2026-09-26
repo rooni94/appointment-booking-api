@@ -3,6 +3,15 @@ import { INestApplication } from '@nestjs/common';
 import { execFileSync } from 'child_process';
 import request = require('supertest');
 
+function databaseTarget(connectionString: string) {
+  const url = new URL(connectionString);
+  const host = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? 'local' : url.hostname;
+  const port = url.port || '5432';
+  const database = decodeURIComponent(url.pathname.slice(1));
+  const schema = url.searchParams.get('schema') || 'public';
+  return `${host}:${port}/${database}?schema=${schema}`;
+}
+
 describe('booking API', () => {
   let app: INestApplication;
   let prisma: import('../src/prisma/prisma.service').PrismaService;
@@ -15,10 +24,11 @@ describe('booking API', () => {
 
   beforeAll(async () => {
     const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+    const applicationDatabaseUrl = process.env.DATABASE_URL;
     if (!testDatabaseUrl) {
       throw new Error('TEST_DATABASE_URL is required');
     }
-    if (testDatabaseUrl === process.env.DATABASE_URL) {
+    if (applicationDatabaseUrl && databaseTarget(testDatabaseUrl) === databaseTarget(applicationDatabaseUrl)) {
       throw new Error('TEST_DATABASE_URL must be different from DATABASE_URL');
     }
     process.env.DATABASE_URL = testDatabaseUrl;
