@@ -4,35 +4,33 @@ A small NestJS API for booking predefined appointment slots safely under concurr
 
 ## Stack
 
-- TypeScript and NestJS
-- PostgreSQL and Prisma ORM
+- TypeScript
+- NestJS
+- PostgreSQL
+- Prisma ORM
 - Socket.IO
 - Swagger / OpenAPI
-- Jest and Supertest
+- Jest / Supertest
 
 ## Requirements
 
-- Node.js 20 or newer
-- PostgreSQL 14 or newer
+- Node.js 20+
+- PostgreSQL 14+
 
 ## Setup
 
-Copy `.env.example` to `.env`, then update the two PostgreSQL connection strings. The application and tests must use separate databases.
+Copy `.env.example` to `.env` and configure:
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/appointments?schema=public"
-TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/appointments_test?schema=public"
-PORT=3000
-```
+- `DATABASE_URL`
+- `TEST_DATABASE_URL`
+- `PORT` (optional, defaults to `3000`)
 
-Create the databases with your PostgreSQL administration tool or `psql`:
+The development and test databases must be separate. Create both databases before applying migrations.
 
 ```sql
 CREATE DATABASE appointments;
 CREATE DATABASE appointments_test;
 ```
-
-Install dependencies, generate Prisma Client, apply the migration, seed the fixed slots, and start the API:
 
 ```bash
 npm install
@@ -42,54 +40,170 @@ npm run seed
 npm run start:dev
 ```
 
-The API base URL is `http://localhost:3000`. No authentication is required.
+## API
 
-## API and documentation
+- `GET /slots`
+- `POST /bookings`
+- `DELETE /bookings/{bookingId}`
 
-- `GET /slots` lists currently available slots.
-- `POST /bookings` books a predefined slot.
-- `DELETE /bookings/{bookingId}` cancels a booking idempotently.
-- Swagger UI: `http://localhost:3000/docs`
-- OpenAPI JSON: `http://localhost:3000/openapi.json`
+Swagger UI: `http://localhost:3000/docs`
+
+OpenAPI JSON: `http://localhost:3000/openapi.json`
+
+No authentication is required.
 
 ## Tests
 
-`TEST_DATABASE_URL` is mandatory and must not match `DATABASE_URL`. The E2E suite resets only the test database, applies all migrations, seeds deterministic slots, and exercises the real HTTP API and PostgreSQL.
+`TEST_DATABASE_URL` must point to a dedicated PostgreSQL database that differs from `DATABASE_URL`.
 
 ```bash
 npm run test:e2e
 ```
 
-The focused suite covers successful booking and availability, two concurrent booking requests with different customer data, one-active-booking persistence, cancellation, rebooking, and idempotent cancellation of the older booking.
+The tests exercise the real HTTP API and PostgreSQL. They include two concurrent booking requests for the same slot and verify that one succeeds, one returns `409`, and only one active booking is stored.
 
 ## Socket.IO
 
-Socket.IO uses the default `/` namespace and `/socket.io` path. It accepts no application events from clients and does not use authentication or rooms.
+- Namespace: `/`
+- Path: `/socket.io`
 
-Start the API, then run the listener in another terminal:
+Run the listener while the API is running:
 
 ```bash
 npm run socket:listen
 ```
 
-A committed booking emits `slot.booked`; the first active-to-cancelled transition emits `slot.released`. Rejected bookings and repeated cancellation emit nothing. Event payloads contain only `slotId`, `bookingId`, and `available`.
+A successful booking emits `slot.booked`. The first successful cancellation emits `slot.released`; repeated cancellation emits no additional event.
+
+## Concurrency
+
+PostgreSQL enforces one active booking per slot using a partial unique index. This prevents double booking when concurrent requests reach the API. Cancelled bookings remain stored but do not participate in the active-booking constraint.
 
 ## Design decisions
 
-Slots are fixed records created by the repeatable Prisma seed. Availability is derived from the absence of an active booking, while cancelled bookings remain stored.
+- Fixed slots are created by the Prisma seed.
+- Cancelled bookings remain stored for history.
+- Availability is based on the absence of an active booking.
+- A database constraint protects the concurrency invariant.
+- Cancellation is idempotent.
 
-PostgreSQL enforces one active booking per slot with a partial unique index. This keeps the rule safe even when two requests reach the API at the same time: one insert commits and the other becomes `409 SLOT_UNAVAILABLE`. Cancelled bookings do not participate in that index, so their slots can be booked again.
+## Possible improvements
 
-Cancellation updates only the requested booking ID and only when its status is active. This makes repeated or concurrent cancellation idempotent and prevents an older cancelled booking from affecting a newer active booking.
-
-Possible improvements include broader negative-case E2E coverage and automated Socket.IO integration tests.
+- Broader negative-case E2E coverage
+- Automated Socket.IO integration tests
 
 ## Submission notes
 
-Actual implementation time: [FILL BEFORE SUBMISSION]
+Actual implementation time: Approximately 2 hours and 45 minutes.
 
-Incomplete requirements: the actual implementation time must be filled by the candidate before submission.
+Incomplete requirements: None.
 
 ## AI usage
 
-AI-assisted coding tools were used during implementation and review. The generated changes were reviewed manually, and the project was built and tested against PostgreSQL. The concurrency behavior, API responses, OpenAPI documentation, and automated tests were verified before submission.
+AI-assisted tools were used for parts of the final review and testing, and to help refine the README. The final implementation was reviewed and tested before submission.
+
+---
+
+# واجهة API لحجز المواعيد
+
+واجهة صغيرة مبنية باستخدام NestJS لحجز مواعيد محددة مسبقًا بأمان عند وصول طلبات متزامنة.
+
+## التقنيات
+
+- TypeScript
+- NestJS
+- PostgreSQL
+- Prisma ORM
+- Socket.IO
+- Swagger / OpenAPI
+- Jest / Supertest
+
+## المتطلبات
+
+- Node.js 20+
+- PostgreSQL 14+
+
+## الإعداد
+
+انسخ `.env.example` إلى `.env`، ثم اضبط:
+
+- `DATABASE_URL`
+- `TEST_DATABASE_URL`
+- `PORT` (اختياري، والقيمة الافتراضية `3000`)
+
+يجب استخدام قاعدتي بيانات منفصلتين للتطوير والاختبارات. أنشئ القاعدتين قبل تطبيق migrations.
+
+```sql
+CREATE DATABASE appointments;
+CREATE DATABASE appointments_test;
+```
+
+```bash
+npm install
+npx prisma generate
+npm run prisma:migrate
+npm run seed
+npm run start:dev
+```
+
+## API
+
+- `GET /slots`
+- `POST /bookings`
+- `DELETE /bookings/{bookingId}`
+
+Swagger UI: `http://localhost:3000/docs`
+
+OpenAPI JSON: `http://localhost:3000/openapi.json`
+
+لا تتطلب الواجهة مصادقة.
+
+## الاختبارات
+
+يجب أن يشير `TEST_DATABASE_URL` إلى قاعدة PostgreSQL مخصصة للاختبارات ومختلفة عن `DATABASE_URL`.
+
+```bash
+npm run test:e2e
+```
+
+تستخدم الاختبارات واجهة HTTP الحقيقية وقاعدة PostgreSQL. ويتحقق اختبار التزامن من أن طلبي حجز متزامنين للموعد نفسه ينتجان نجاح طلب واحد وإرجاع `409` للآخر، مع تخزين حجز نشط واحد فقط.
+
+## Socket.IO
+
+- Namespace: `/`
+- Path: `/socket.io`
+
+شغّل المستمع أثناء تشغيل API:
+
+```bash
+npm run socket:listen
+```
+
+يصدر الحدث `slot.booked` بعد نجاح الحجز، ويصدر `slot.released` عند أول إلغاء ناجح. لا يصدر حدث إضافي عند تكرار الإلغاء.
+
+## منع الحجز المزدوج
+
+تفرض PostgreSQL وجود حجز نشط واحد فقط لكل موعد باستخدام partial unique index. يمنع ذلك الحجز المزدوج عند وصول طلبات متزامنة. تبقى الحجوزات الملغاة محفوظة، لكنها لا تدخل ضمن قيد الحجز النشط.
+
+## أهم قرارات التصميم
+
+- تُنشأ المواعيد الثابتة بواسطة Prisma seed.
+- تبقى الحجوزات الملغاة محفوظة كسجل تاريخي.
+- يعتمد التوفر على عدم وجود حجز نشط.
+- يحمي قيد قاعدة البيانات من تعارض الحجوزات المتزامنة.
+- عملية الإلغاء idempotent.
+
+## تحسينات مستقبلية
+
+- توسيع تغطية حالات الخطأ في اختبارات E2E
+- إضافة اختبارات تكامل آلية لأحداث Socket.IO
+
+## ملاحظات التسليم
+
+وقت التنفيذ الفعلي: حوالي ساعتين و45 دقيقة.
+
+المتطلبات غير المكتملة: لا يوجد.
+
+## استخدام أدوات الذكاء الاصطناعي
+
+استُخدمت أدوات مساعدة بالذكاء الاصطناعي في بعض أجزاء المراجعة والاختبار النهائي، والمساعدة في تحسين ملف README. تمت مراجعة واختبار النسخة النهائية قبل التسليم.
