@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
-import { AppointmentsModule } from './appointments/appointments.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { SlotsModule } from './slots/slots.module';
 
-@Module({
-  imports: [PrismaModule, AppointmentsModule],
-})
+@Module({ imports: [PrismaModule, SlotsModule, BookingsModule] })
 export class AppModule {}

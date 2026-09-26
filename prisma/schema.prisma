@@ -7,20 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum AppointmentStatus {
-  CONFIRMED
-  CANCELLED
+enum BookingStatus {
+  active
+  cancelled
 }
 
-model Appointment {
-  id         String            @id @default(uuid())
-  resourceId String
-  customer   String
-  startAt    DateTime
-  endAt      DateTime
-  status     AppointmentStatus @default(CONFIRMED)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+model Slot {
+  id       String    @id @default(uuid()) @db.Uuid
+  startsAt DateTime
+  endsAt   DateTime
+  bookings Booking[]
 
-  @@index([resourceId, startAt, endAt])
+  @@index([startsAt, id])
+}
+
+model Booking {
+  id            String        @id @default(uuid()) @db.Uuid
+  slotId        String        @db.Uuid
+  customerName  String
+  customerEmail String
+  status        BookingStatus @default(active)
+  createdAt     DateTime      @default(now())
+  slot          Slot          @relation(fields: [slotId], references: [id], onDelete: Restrict)
+
+  @@index([slotId])
 }

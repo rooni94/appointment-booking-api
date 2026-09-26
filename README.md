@@ -1,65 +1,95 @@
 # Appointment Booking API
 
-Small NestJS API for booking appointments safely when multiple requests arrive at the same time.
+A small NestJS API for booking predefined appointment slots safely under concurrent requests.
 
 ## Stack
 
-- NestJS + TypeScript
-- PostgreSQL
-- Prisma ORM
+- TypeScript and NestJS
+- PostgreSQL and Prisma ORM
 - Socket.IO
 - Swagger / OpenAPI
-- Jest + Supertest
-- Docker Compose
+- Jest and Supertest
 
-## Run locally
+## Requirements
+
+- Node.js 20 or newer
+- PostgreSQL 14 or newer
+
+## Setup
+
+Copy `.env.example` to `.env`, then update the two PostgreSQL connection strings. The application and tests must use separate databases.
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/appointments?schema=public"
+TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/appointments_test?schema=public"
+PORT=3000
+```
+
+Create the databases with your PostgreSQL administration tool or `psql`:
+
+```sql
+CREATE DATABASE appointments;
+CREATE DATABASE appointments_test;
+```
+
+Install dependencies, generate Prisma Client, apply the migration, seed the fixed slots, and start the API:
 
 ```bash
-cp .env.example .env
-docker compose up -d
 npm install
 npx prisma generate
-npx prisma migrate deploy
+npm run prisma:migrate
+npm run seed
 npm run start:dev
 ```
 
-The API runs on `http://localhost:3000` and Swagger is available at `http://localhost:3000/docs`.
+The API base URL is `http://localhost:3000`. No authentication is required.
 
-## Endpoints
+## API and documentation
 
-- `POST /appointments` creates an appointment.
-- `GET /appointments/:id` returns an appointment.
-- `PATCH /appointments/:id` updates an appointment.
-- `PATCH /appointments/:id/cancel` cancels an appointment.
-
-## Real-time events
-
-Socket.IO emits:
-
-- `appointment.created`
-- `appointment.updated`
-- `appointment.cancelled`
-
-Each event contains the current appointment object.
-
-## Double-booking protection
-
-The database has a PostgreSQL exclusion constraint for confirmed appointments. It prevents overlapping time ranges for the same resource. The range uses `[startAt, endAt)`, so an appointment can start exactly when the previous one ends.
-
-Keeping this rule in PostgreSQL avoids the race condition caused by checking availability in application code before inserting. If concurrent requests try to reserve the same slot, one succeeds and the conflicting request receives `409 Conflict`. Cancelling an appointment removes it from the active constraint, so that time becomes bookable again.
+- `GET /slots` lists currently available slots.
+- `POST /bookings` books a predefined slot.
+- `DELETE /bookings/{bookingId}` cancels a booking idempotently.
+- Swagger UI: `http://localhost:3000/docs`
+- OpenAPI JSON: `http://localhost:3000/openapi.json`
 
 ## Tests
 
-With PostgreSQL running and migrations applied:
+`TEST_DATABASE_URL` is mandatory and must not match `DATABASE_URL`. The E2E suite resets only the test database, applies all migrations, seeds deterministic slots, and exercises the real HTTP API and PostgreSQL.
 
 ```bash
 npm run test:e2e
 ```
 
-The tests cover creation, invalid ranges, adjacent slots, overlaps, concurrent requests, cancellation/rebooking, and conflicting updates.
+The focused suite covers successful booking and availability, two concurrent booking requests with different customer data, one-active-booking persistence, cancellation, rebooking, and idempotent cancellation of the older booking.
 
-## Challenge time
+## Socket.IO
 
-Actual implementation and verification time: approximately 2 hours.
+Socket.IO uses the default `/` namespace and `/socket.io` path. It accepts no application events from clients and does not use authentication or rooms.
 
-Incomplete parts: none for the requested scope.
+Start the API, then run the listener in another terminal:
+
+```bash
+npm run socket:listen
+```
+
+A committed booking emits `slot.booked`; the first active-to-cancelled transition emits `slot.released`. Rejected bookings and repeated cancellation emit nothing. Event payloads contain only `slotId`, `bookingId`, and `available`.
+
+## Design decisions
+
+Slots are fixed records created by the repeatable Prisma seed. Availability is derived from the absence of an active booking, while cancelled bookings remain stored.
+
+PostgreSQL enforces one active booking per slot with a partial unique index. This keeps the rule safe even when two requests reach the API at the same time: one insert commits and the other becomes `409 SLOT_UNAVAILABLE`. Cancelled bookings do not participate in that index, so their slots can be booked again.
+
+Cancellation updates only the requested booking ID and only when its status is active. This makes repeated or concurrent cancellation idempotent and prevents an older cancelled booking from affecting a newer active booking.
+
+Possible improvements include broader negative-case E2E coverage and automated Socket.IO integration tests.
+
+## Submission notes
+
+Actual implementation time: [FILL BEFORE SUBMISSION]
+
+Incomplete requirements: None.
+
+## AI usage
+
+AI-assisted coding tools were used during implementation and review. The generated changes were reviewed manually, and the project was built and tested against PostgreSQL. The concurrency behavior, API responses, OpenAPI documentation, and automated tests were verified before submission.
